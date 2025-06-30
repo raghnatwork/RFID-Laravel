@@ -4,19 +4,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Log;
 
-// Dasboard
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\Auth\LoginController;
-
-// Model dan Controller Parkir
+// Model Parkir
 use App\Models\Masuk;
 use App\Models\DetailParkir;
-// use App\Events\RefreshParkingTable;
+
 
 // Untuk timestamp
 use Illuminate\Support\Carbon;
 
-// Rute untuk menerima data kartu dari NodeMCU
+// Rute untuk parkir masuk
 Route::post('/kartu/masuk', function (Request $request) {
     $uid = $request->input('uid');
 
@@ -26,19 +22,14 @@ Route::post('/kartu/masuk', function (Request $request) {
     }
 
     try {
-        // Logika ini menyimpan atau memperbarui data di tabel 'masuk'
+
+        // Menambahkan id dan waktu saat parkir masuk
         $masukEntry = Masuk::updateOrCreate(
             ['id_kendaraan' => $uid],
             ['waktu' => Carbon::now()]
         );
         
-        // Tambahkan log ini
-    // Log::info('MENCOBA MENGIRIM BROADCAST KE PUSHER...');
-    
-    // // broadcast(new RefreshParkingTable());
-
-    // Log::info('BROADCAST BERHASIL DIKIRIM (TANPA ERROR).');
-
+        // Respon yang akan diberikan ke nodemcu
         return response()->json([
             'kode' => 'masuk',
             'status' => 'success',
@@ -57,7 +48,7 @@ Route::post('/kartu/masuk', function (Request $request) {
 });
 
 
-// Rute untuk MENCATAT KARTU KELUAR
+// Rute untuk parkir keluar
 Route::post('/kartu/keluar', function (Request $request) {
     $uid = $request->input('uid');
 
@@ -67,7 +58,7 @@ Route::post('/kartu/keluar', function (Request $request) {
     }
 
     try {
-        // Mencari entri di tabel 'masuk' berdasarkan 'id_kendaraan'
+        // Mencari id_kendaraan di tabel masuk berdasarkan id_kendaraan
         $masukEntry = Masuk::where('id_kendaraan', $uid)->first();
 
         if (!$masukEntry) {
@@ -75,25 +66,25 @@ Route::post('/kartu/keluar', function (Request $request) {
             return response()->json(['status' => 'error', 'message' => 'Kendaraan ini tidak tercatat masuk'], 404);
         }
 
+        // Manipulasi waktu agar mudah diolah
         $waktuMasuk = Carbon::parse($masukEntry->waktu);
         $waktuKeluar = Carbon::now();
 
         // $durasiMenit = abs($waktuKeluar->diffInMinutes($waktuMasuk));
-        
         // $durasiJam = ceil($durasiMenit / 60);
         // if ($durasiJam == 0) $durasiJam = 1; // Minimal dihitung 1 jam
         // $tarif = $durasiJam * 2000;
 
 
-        $durasiDetik = round(abs($waktuKeluar->diffInSeconds($waktuMasuk))); // <-- Tambahkan round()
-        // Anda masih bisa menghitung durasiMenit dan durasiJam untuk tarif
-        $durasiMenit = ceil($durasiDetik / 60); // Menit dibulatkan ke atas jika perlu
-        $durasiJam = ceil($durasiMenit / 60); // Jam dibulatkan ke atas jika perlu
-        if ($durasiJam == 0) $durasiJam = 1; // Minimal dihitung 1 jam
+        // Rumus untuk menentukan tarif parkir dan durasi parkir
+        $durasiDetik = round(abs($waktuKeluar->diffInSeconds($waktuMasuk))); 
+        $durasiMenit = ceil($durasiDetik / 60); 
+        $durasiJam = ceil($durasiMenit / 60); 
+        if ($durasiJam == 0) $durasiJam = 1; 
         $tarif = $durasiJam * 2000;
 
 
-        // Catat ke 'detail_parkir'
+        // Memasukan data ke tabel detail_parkir
         $detailParkir = DetailParkir::create([
             'id_kendaraan' => $uid,
             'waktu_masuk' => $waktuMasuk,
@@ -102,12 +93,10 @@ Route::post('/kartu/keluar', function (Request $request) {
             'tarif' => $tarif,
         ]);
 
-        // Hapus dari tabel 'masuk'
+        // Hapus id kendaraaan yang sudah keluar dari tabel masuk
         $masukEntry->delete();
-        Log::info('UID ' . $uid . ' berhasil dicatat KELUAR.');
-        
-        
-        
+       
+        // Respon yang akan diberikan ke nodemcu
         return response()->json([
             'kode' => 'keluar',
             'status' => 'success',

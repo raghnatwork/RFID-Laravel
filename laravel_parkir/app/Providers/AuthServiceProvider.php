@@ -15,7 +15,7 @@ class AuthServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Log::info('AuthServiceProvider boot method dipanggil.'); // Debugging: Konfirmasi boot method dipanggil
+        // Log::info('AuthServiceProvider boot method dipanggil.'); // Debugging: Konfirmasi boot method dipanggil
 
         // Gate 'create-user': Hanya super_admin
         Gate::define('create-user', function (User $user) {
@@ -40,7 +40,7 @@ class AuthServiceProvider extends ServiceProvider
                 Log::info('Gate::before memberikan TRUE karena super_admin.');
                 return true;
             }
-            Log::info('Gate::before mengembalikan NULL.'); // Mengembalikan null berarti Gate lain yang akan dievaluasi
+            // Log::info('Gate::before mengembalikan NULL.'); // Mengembalikan null berarti Gate lain yang akan dievaluasi
             return null;
         });
     }
